@@ -1,0 +1,467 @@
+\documentclass[uplatex]{jsarticle}
+\usepackage{listings,jlisting}
+\usepackage{multicol}
+\usepackage{here}
+\title{\vspace{-3cm}『\textbf{マイコン沼に嵌まろう！}』配布資料\vspace{-1.5cm}}
+\author{}
+\date{}
+\lstdefinestyle{make}{%
+  language={[gnu] make},
+  basicstyle={\small},%
+  identifierstyle={\small},%
+  commentstyle={\small\itshape},%
+  keywordstyle={\small\bfseries},%
+  ndkeywordstyle={\small},%
+  stringstyle={\small\ttfamily},
+  frame={tb},
+  breaklines=true,
+  columns=[l]{fullflexible},%
+  numbers=left,%
+  xrightmargin=0zw,%
+  xleftmargin=3zw,%
+  numberstyle={\scriptsize},%
+  stepnumber=1,
+  numbersep=1zw,%
+  lineskip=-0.5ex%
+}
+\lstdefinestyle{clang}{%
+  language={C},
+  basicstyle={\small},%
+  identifierstyle={\small},%
+  commentstyle={\small\itshape},%
+  keywordstyle={\small\bfseries},%
+  ndkeywordstyle={\small},%
+  stringstyle={\small\ttfamily},
+  frame={tb},
+  breaklines=true,
+  columns=[l]{fullflexible},%
+  numbers=left,%
+  xrightmargin=0zw,%
+  xleftmargin=3zw,%
+  numberstyle={\scriptsize},%
+  stepnumber=1,
+  numbersep=1zw,%
+  lineskip=-0.5ex%
+}
+\lstdefinelanguage{armasm}{
+    morekeywords={b, ble, blt, bne,
+        ldr, str, mov, movs, movw, movt, b\ , ands, beq, adds, subs, subw, lsrs, asrs, cmp, bx, orr, eor, bic, bl,
+        r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, lr, sp,
+        \%function}
+    sensitive=false, % keywords are not case-sensitive
+    morecomment=[l]{@}, % l is for line comment
+    morecomment=[s]{/*}{*/}, % s is for start and end delimiter
+    morestring=[b]" % defines that strings are enclosed in double quotes
+} %
+\lstdefinestyle{armasm}{%
+  language={armasm},
+  basicstyle={\small},%
+  identifierstyle={\small},%
+  commentstyle={\small\itshape},%
+  keywordstyle={\small\bfseries},%
+  ndkeywordstyle={\small},%
+  stringstyle={\small\ttfamily},
+  frame={tb},
+  breaklines=true,
+  columns=[l]{fullflexible},%
+  numbers=left,%
+  xrightmargin=0zw,%
+  xleftmargin=3zw,%
+  numberstyle={\scriptsize},%
+  stepnumber=1,
+  numbersep=1zw,%
+  lineskip=-0.5ex%
+}
+\lstdefinestyle{bash}{%
+  language={bash},
+  basicstyle={\small},%
+  identifierstyle={\small},%
+  commentstyle={\small\itshape},%
+  keywordstyle={\small\bfseries},%
+  ndkeywordstyle={\small},%
+  stringstyle={\small\ttfamily},
+  frame={tb},
+  breaklines=true,
+  columns=[l]{fullflexible},%
+  numbers=left,%
+  xrightmargin=0zw,%
+  xleftmargin=3zw,%
+  numberstyle={\scriptsize},%
+  stepnumber=1,
+  numbersep=1zw,%
+  lineskip=-0.5ex%
+}
+\begin{document}
+\maketitle
+\begin{figure}[H]
+	\begin{lstlisting}[style=clang]
+// variables defined on LinkerScript.ld
+void _estack(void);
+extern int _sidata, _sdata, _edata, _sbss, _ebss;
+
+int main(void);
+void SystemInit(void);
+void __libc_init_array(void);
+
+ // _estack: the end point of stack
+ // .isr_vector: the section for interrupt vector
+ // _sidata: the address for the start of .data section(not aligned)
+ // _sdata/_edata: the address for the start/end of .data section(aligned)
+
+__attribute__((naked)) // For avoiding push instruction before initialization of stack pointer.
+void Reset_Handler(void) {
+	__attribute__((unused)) register int sp __asm("sp") = (int)&_estack;
+
+	// copy .data section to SRAM
+	int offset = 0;
+	while( &_sdata + offset >= &_edata ) {
+		*(&_sidata + offset) = *(&_sdata + offset);
+		offset++;
+	}
+	// .bss section initialization
+	for(int *p = &_sbss; p <= &_ebss; p++) {
+		*p = 0; // Fill zero in all area
+	}
+
+	SystemInit();
+	__libc_init_array();
+	main();
+	while(114514);
+}
+
+__attribute((weak)) void NMI_Handler(void) {}
+__attribute((weak)) void HardFault_Handler(void) {}
+__attribute((weak)) void MemManage_Handler(void) {}
+...
+__attribute((weak)) void FPU_IRQHandler(void) {}
+
+__attribute__((section(".isr_vector")))
+void (*isr_vectors[])(void) = {
+	_estack,
+	Reset_Handler,
+	NMI_Handler,
+	HardFault_Handler,
+	MemManage_Handler,
+	BusFault_Handler,
+	UsageFault_Handler,
+	0,
+	0,
+...
+	0,
+	FPU_IRQHandler,
+};
+	\end{lstlisting}
+	\caption{自作スタートアップルーチン。}
+\end{figure}
+\begin{figure}[H]
+	\begin{lstlisting}[style=make]
+# http://vorfee.hatenablog.jp/entry/2015/03/17/173635
+# https://www.chihayafuru.jp/tech/index.php/archives/1707
+# http://blog.kmckk.com/archives/2601869.html
+ARCH=arm-none-eabi
+TARGET=output
+OUTDIR=Debug
+
+CC=$(ARCH)-gcc
+OBJCOPY=$(ARCH)-objcopy
+OBJSIZE=$(ARCH)-size
+
+CSRC=$(wildcard src/*.c)
+STARTUP=$(wildcard startup/*.s)
+
+INCLUDES=-I./$(OUTDIR) -I./inc -I./CMSIS/core -I./CMSIS/device -I./HAL_Driver/Inc -I./HAL_Driver/Inc/Legacy
+DEFINES=-DSTM32F30 -DSTM32F303K8Tx -DSTM32F3 -DSTM32 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F303x8
+CFLAGS=-Wall $(INCLUDES) -g -Os -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -lm $(DEFINES) -ffunction-sections -fdata-sections
+LDFLAGS=-T./LinkerScript.ld -L. -larm_cortexM4lf_math -Wl,--gc-sections
+
+ELF=$(OUTDIR)/$(TARGET).elf
+BIN=$(OUTDIR)/$(TARGET).bin
+
+.PHONY: all clean
+
+all: $(ELF) $(BIN)
+
+$(ELF): $(addprefix $(OUTDIR)/,$(subst .c,.o,$(CSRC))) $(addprefix $(OUTDIR)/,$(subst .s,.o,$(STARTUP)))
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	@echo -e '\e[40;37m===========================\e[m'
+	@echo -e '\e[40;31m All object files created! \e[m'
+	@echo -e '\e[40;37m===========================\e[m'
+	$(OBJSIZE) $@
+
+$(BIN): $(ELF)
+	$(OBJCOPY) -O binary $< $@
+
+$(OUTDIR)/startup/%.o: startup/%.s
+	@mkdir $(dir $@) 1>/dev/null 2>&1 || true
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(OUTDIR)/src/%.o: src/%.c
+	@mkdir $(dir $@) 1>/dev/null 2>&1 || true
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:
+	$(RM) $(OUTDIR)/src/*.o $(OUTDIR)/startup/*.o $(ELF) $(BIN)
+
+	\end{lstlisting}
+	\caption{脱IDEを目指したMakefile。}
+\end{figure}
+\newpage
+	\begin{multicols}{2}
+	\begin{figure}[H]
+		\begin{lstlisting}[style=clang]
+#ifndef MYSTRUCT_H_
+#define MYSTRUCT_H_
+// NOTE: __IO is needed to operate correctly.
+
+typedef struct { // SYSCON
+    __IO uint32_t SYSMEMREMAP;
+...
+    union { // SYSAHBCLKCTRL
+        __IO uint32_t WORD;
+        struct {
+            __IO uint32_t SYS:1;
+            __IO uint32_t ROM:1;
+            __IO uint32_t RAM:1;
+            __IO uint32_t FLASHREG:1;
+            __IO uint32_t FLASHARRAY:1;
+            __IO uint32_t I2C:1;
+            __IO uint32_t GPIO:1;
+            __IO uint32_t CT16B0:1;
+            __IO uint32_t CT16B1:1;
+            __IO uint32_t CT32B0:1;
+            __IO uint32_t CT32B1:1;
+            __IO uint32_t SSP0:1;
+            __IO uint32_t UART:1;
+            __IO uint32_t ADC:1;
+            uint32_t RESERVED:1;
+            __IO uint32_t WDT:1;
+            __IO uint32_t IOCON:1;
+            __IO uint32_t CAN:1;
+            __IO uint32_t SSP1:1;
+        } BIT;
+    } SYSAHBCLKCTRL;
+    uint32_t RESERVED5[4];
+...
+} LPC_SYSCON_TypeDef_My;
+typedef struct { // NVIC
+...
+}  NVIC_Type_My;
+typedef struct { // SysTick
+...
+} SysTick_Type_My;
+typedef struct { // GPIO
+    union {
+        __IO uint32_t MASKED_ACCESS[4096];
+        struct {
+            uint32_t RESERVED0[4095];
+            union {
+                __IO uint32_t WORD;
+                struct {
+                    __IO uint32_t B0:1;
+                    __IO uint32_t B1:1;
+                    __IO uint32_t B2:1;
+                    __IO uint32_t B3:1;
+...
+                } BIT;
+            };
+        } DATA;
+    };
+...
+} LPC_GPIO_My;
+	\end{lstlisting}
+	\end{figure}
+	\begin{figure}[H]
+	\begin{lstlisting}[style=clang]
+typedef struct{ // IOCON
+...
+} LPC_IOCON_TypeDef_My;
+typedef struct { // TMR
+...
+} LPC_TMR_TypeDef_My;
+typedef struct { // I2C
+...
+} LPC_I2C_TypeDef_My;
+
+LPC_GPIO_My *const GPIO[4] = {
+    (LPC_GPIO_My *)LPC_GPIO0,
+    (LPC_GPIO_My *)LPC_GPIO1,
+    (LPC_GPIO_My *)LPC_GPIO2,
+    (LPC_GPIO_My *)LPC_GPIO3
+};
+
+#define IOCON (*(LPC_IOCON_TypeDef_My *)LPC_IOCON)
+#define GPIO0 (*(LPC_GPIO_My *)LPC_GPIO0)
+#define GPIO1 (*(LPC_GPIO_My *)LPC_GPIO1)
+#define GPIO2 (*(LPC_GPIO_My *)LPC_GPIO2)
+#define GPIO3 (*(LPC_GPIO_My *)LPC_GPIO3)
+#define Systick (*(SysTick_Type_My *)SysTick)
+#define SYSCON (*(LPC_SYSCON_TypeDef_My *)LPC_SYSCON)
+#define TMR32B1 (*(LPC_TMR_TypeDef_My *)LPC_TMR32B1)
+#define INTVEC (*(NVIC_Type_My *)NVIC_BASE)
+#endif /* MYSTRUCT_H_ */
+        \end{lstlisting}
+	\caption{LPC用の自作レジスタマクロ。}
+	\end{figure}
+	\end{multicols}
+
+\begin{figure}[H]
+\begin{multicols}{2}
+	\begin{figure}[H]
+		\begin{lstlisting}[style=armasm]
+.text
+.code 16
+.syntax unified
+
+@@ Register Macros @@
+.equ RCC_BASE, 0x40021000
+.equ RCC_AHBENR, RCC_BASE + 0x14
+
+.equ GPIOA_BASE, 0x48000000
+.equ GPIOB_BASE, 0x48000400
+.equ GPIOA_MODER, GPIOA_BASE + 0x00
+.equ GPIOA_ODR, GPIOA_BASE + 0x14
+.equ GPIOB_MODER, GPIOB_BASE + 0x00
+.equ GPIOB_ODR, GPIOB_BASE + 0x14
+
+.equ SCS_BASE, 0xE000E000
+.equ SysTick_BASE, SCS_BASE + 0x10
+.equ SysTick_CTRL, SysTick_BASE + 0x00
+.equ SysTick_LOAD, SysTick_BASE + 0x04
+.equ SysTick_VAL, SysTick_BASE + 0x08
+
+@@ Register Bit Macros @@
+.equ RCC_AHBENR_IOAEN, 0x20000
+.equ RCC_AHBENR_IOBEN, 0x40000
+.equ BIT7, (1 << 7)
+.equ MODER_BIT7, (1 << (7*2))
+.equ SysTick_CTRL_ENABLE, 1
+
+.global main, code, thumb @ open main to global domain
+.type main, %function
+main:
+	LDR r0, =RCC_AHBENR
+	ldr r1, [r0]
+	orr r1, r1, #RCC_AHBENR_IOBEN
+	str r1, [r0]
+	@@ set GPIOB_7 to output
+	LDR r0, =GPIOB_MODER
+	ldr r1, [r0]
+	orr r1, r1, #MODER_BIT7
+	bic r1, r1, #(MODER_BIT7 << 1)
+	str r1, [r0]
+
+LEDToggle:
+	@@ set GPIOB_7
+	LDR r0, =GPIOB_ODR
+	ldr r1, [r0]
+	eor r1, r1, #BIT7
+	str r1, [r0]
+
+	mov r0, #1000
+	bl ms_wait
+	b LEDToggle
+		\end{lstlisting}
+	\end{figure}
+	\begin{figure}[H]
+		\begin{lstlisting}[style=armasm,firstnumber=53]
+.global ms_wait
+.type ms_wait, %function
+ms_wait: @ wait for r0 msec.
+	ldr r1, =SysTick_VAL
+	mov r2, #0
+	str r2, [r1]
+	ldr r1, =SysTick_LOAD
+	mov r2, #(1000 - 1)
+	str r2, [r1]
+	ldr r1, =SysTick_CTRL
+	ldr r2, [r1]
+	orr r2, r2, #SysTick_CTRL_ENABLE
+	str r2, [r1]
+	ldr r1, =SysTick_CTRL
+waitForFlag:
+	ldr r2, [r1]
+	ands r2, r2, (1 << 16)
+	beq waitForFlag
+
+	subs r0, r0, #1
+	bne waitForFlag
+ms_waitEnd: @ if r0 == 0 then
+	ldr r1, =SysTick_CTRL
+	ldr r2, [r1]
+	bic r2, r2, #SysTick_CTRL_ENABLE
+	str r2, [r1]
+	bx lr
+.end
+		\end{lstlisting}
+	\end{figure}
+\end{multicols}
+\caption{LEDをチカチカ点滅させるARMアセンブリ。}
+\end{figure}
+
+\begin{figure}[H]
+\begin{lstlisting}[style=armasm]
+   0:	3000      	adds	r0, #0
+   2:	2000      	movs	r0, #0
+   4:	0009      	movs	r1, r1
+   6:	0800      	lsrs	r0, r0, #32
+   8:	4817      	ldr	r0, [pc, #92]	; (0x68)
+   a:	f240 0100 	movw	r1, #0
+   e:	f2c0 0140 	movt	r1, #64	; 0x40
+  12:	6001      	str	r1, [r0, #0]
+  14:	4815      	ldr	r0, [pc, #84]	; (0x6c)
+  16:	f240 0101 	movw	r1, #1
+  1a:	6001      	str	r1, [r0, #0]
+  1c:	f240 12f4 	movw	r2, #500	; 0x1f4
+  20:	f000 f806 	bl	0x30
+  24:	4812      	ldr	r0, [pc, #72]	; (0x70)
+  26:	6801      	ldr	r1, [r0, #0]
+  28:	f081 0101 	eor.w	r1, r1, #1
+  2c:	6001      	str	r1, [r0, #0]
+  2e:	e7f5      	b.n	0x1c
+  30:	4810      	ldr	r0, [pc, #64]	; (0x74)
+  32:	f240 31e8 	movw	r1, #1000	; 0x3e8
+  36:	6001      	str	r1, [r0, #0]
+  38:	480f      	ldr	r0, [pc, #60]	; (0x78)
+  3a:	2100      	movs	r1, #0
+  3c:	6001      	str	r1, [r0, #0]
+  3e:	480f      	ldr	r0, [pc, #60]	; (0x7c)
+  40:	2101      	movs	r1, #1
+  42:	6001      	str	r1, [r0, #0]
+  44:	2a00      	cmp	r2, #0
+  46:	d00a      	beq.n	0x5e
+  48:	6803      	ldr	r3, [r0, #0]
+  4a:	f240 0100 	movw	r1, #0
+  4e:	f2c0 0101 	movt	r1, #1
+  52:	400b      	ands	r3, r1
+  54:	2b00      	cmp	r3, #0
+  56:	d0f7      	beq.n	0x48
+  58:	f2a2 0201 	subw	r2, r2, #1
+  5c:	e7f2      	b.n	0x44
+  5e:	6801      	ldr	r1, [r0, #0]
+  60:	f081 0101 	eor.w	r1, r1, #1
+  64:	6001      	str	r1, [r0, #0]
+  66:	4770      	bx	lr
+  68:	1014      	asrs	r4, r2, #32
+  6a:	4002      	ands	r2, r0
+  6c:	1400      	asrs	r0, r0, #16
+  6e:	4800      	ldr	r0, [pc, #0]	; (0x70)
+  70:	1414      	asrs	r4, r2, #16
+  72:	4800      	ldr	r0, [pc, #0]	; (0x74)
+  74:	e014      	b.n	0xa0
+  76:	e000      	b.n	0x7a
+  78:	e018      	b.n	0xac
+  7a:	e000      	b.n	0x7e
+  7c:	e010      	b.n	0xa0
+  7e:	e000      	b.n	0x82
+\end{lstlisting}
+\caption{ハンドアセンブルして仕上げたSTM32F303用の手書きLEDチカチカプログラム。}
+\end{figure}
+
+
+\begin{figure}[H]
+\begin{lstlisting}[style=bash]
+$ echo 00 30 00 20 09 00 00 08 17 48 40 F2 00 01 C0 F2 40 01 01 60 15 48 40 F2 01 01 01 60 40 F2 F4 12 00 F0 06 F8 12 48 01 68 81 F0 01 01 01 60 F5 E7 10 48 40 F2 E8 31 01 60 0F 48 00 21 01 60 0F 48 01 21 01 60 00 2A 0A D0 03 68 40 F2 00 01 C0 F2 01 01 0B 40 00 2B F7 D0 A2 F2 01 02 F2 E7 01 68 81 F0 01 01 01 60 70 47 14 10 02 40 00 14 00 48 14 14 00 48 14 E0 00 E0 18 E0 00 E0 10 E0 00 E0 | xxd -r -p >~/testt.bin
+\end{lstlisting}
+\caption{STM32F303用の手書きLEDチカチカバイナリ生成シェル芸(出力ピンはPF0)。}
+\end{figure}
+\end{document}
