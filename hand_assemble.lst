@@ -1,0 +1,60 @@
+
+/Users/yuki/testt.bin:     file format binary
+
+
+Disassembly of section .data:
+
+00000000 <.data>:
+   0:	3000      	adds	r0, #0
+   2:	2000      	movs	r0, #0
+   4:	0009      	movs	r1, r1
+   6:	0800      	lsrs	r0, r0, #32
+   8:	4817      	ldr	r0, [pc, #92]	; (0x68)
+   a:	f240 0100 	movw	r1, #0
+   e:	f2c0 0140 	movt	r1, #64	; 0x40
+  12:	6001      	str	r1, [r0, #0]
+  14:	4815      	ldr	r0, [pc, #84]	; (0x6c)
+  16:	f240 0101 	movw	r1, #1
+  1a:	6001      	str	r1, [r0, #0]
+  1c:	f240 12f4 	movw	r2, #500	; 0x1f4
+  20:	f000 f806 	bl	0x30
+  24:	4812      	ldr	r0, [pc, #72]	; (0x70)
+  26:	6801      	ldr	r1, [r0, #0]
+  28:	f081 0101 	eor.w	r1, r1, #1
+  2c:	6001      	str	r1, [r0, #0]
+  2e:	e7f5      	b.n	0x1c
+  30:	4810      	ldr	r0, [pc, #64]	; (0x74)
+  32:	f240 31e8 	movw	r1, #1000	; 0x3e8
+  36:	6001      	str	r1, [r0, #0]
+  38:	480f      	ldr	r0, [pc, #60]	; (0x78)
+  3a:	2100      	movs	r1, #0
+  3c:	6001      	str	r1, [r0, #0]
+  3e:	480f      	ldr	r0, [pc, #60]	; (0x7c)
+  40:	2101      	movs	r1, #1
+  42:	6001      	str	r1, [r0, #0]
+  44:	2a00      	cmp	r2, #0
+  46:	d00a      	beq.n	0x5e
+  48:	6803      	ldr	r3, [r0, #0]
+  4a:	f240 0100 	movw	r1, #0
+  4e:	f2c0 0101 	movt	r1, #1
+  52:	400b      	ands	r3, r1
+  54:	2b00      	cmp	r3, #0
+  56:	d0f7      	beq.n	0x48
+  58:	f2a2 0201 	subw	r2, r2, #1
+  5c:	e7f2      	b.n	0x44
+  5e:	6801      	ldr	r1, [r0, #0]
+  60:	f081 0101 	eor.w	r1, r1, #1
+  64:	6001      	str	r1, [r0, #0]
+  66:	4770      	bx	lr
+  68:	1014      	asrs	r4, r2, #32
+  6a:	4002      	ands	r2, r0
+  6c:	1400      	asrs	r0, r0, #16
+  6e:	4800      	ldr	r0, [pc, #0]	; (0x70)
+  70:	1414      	asrs	r4, r2, #16
+  72:	4800      	ldr	r0, [pc, #0]	; (0x74)
+  74:	e014      	b.n	0xa0
+  76:	e000      	b.n	0x7a
+  78:	e018      	b.n	0xac
+  7a:	e000      	b.n	0x7e
+  7c:	e010      	b.n	0xa0
+  7e:	e000      	b.n	0x82
