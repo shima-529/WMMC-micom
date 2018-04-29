@@ -108,9 +108,9 @@ void __libc_init_array(void);
  // _sidata: the address for the start of .data section(not aligned)
  // _sdata/_edata: the address for the start/end of .data section(aligned)
 
-__attribute__((naked)) // For avoiding push instruction before initialization of stack pointer.
+% __attribute__((naked)) // For avoiding push instruction before initialization of stack pointer.
 void Reset_Handler(void) {
-	__attribute__((unused)) register int sp __asm("sp") = (int)&_estack;
+	% __attribute__((unused)) register int sp __asm("sp") = (int)&_estack;
 
 	// copy .data section to SRAM
 	int offset = 0;
