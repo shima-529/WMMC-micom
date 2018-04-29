@@ -17,7 +17,7 @@ $ arm-none-eabi-ld -Ttext 0x08000000 -o blink.elf blink.o
 
 - hand\_assemble.lst
     - アセンブラを使わず紙と鉛筆によってハンドアセンブルしたLチカプログラムです。F303向けで、生成したバイナリを `arm-none-eabi-objdump` にかけた出力結果となります。
-- resume
+- resume/untitled.tex/pdf
     - 発表した内容についての補足 PDF です。ディレクトリ内には TeX のソースファイルと完成した pdf ファイルが入っています。
 
 # 引用・転載について
