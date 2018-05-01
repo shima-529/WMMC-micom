@@ -8,7 +8,9 @@ extern int _ebss;
 
 int main(void);
 void SystemInit(void);
+#ifdef __cplusplus
 void __libc_init_array(void);
+#endif /* __cplusplus */
 
 /*
  * estack: the end point of stack
@@ -17,24 +19,25 @@ void __libc_init_array(void);
  * _sdata: the address for the start of .data section(aligned)
  * _edata: the address for the end of .data section
  */
-// __attribute__((naked)) // For avoiding push instruction before initialization of stack pointer.
 void Reset_Handler(void) {
-	// __attribute__((unused)) register int sp asm("sp") = (int)&_estack;
-
 	// copy .data section to SRAM
 	int offset = 0;
-	while( &_sdata + offset >= &_edata ) {
-		*(&_sidata + offset) = *(&_sdata + offset);
+	while( &_sdata + offset < &_edata ) {
+		*(&_sdata + offset) = *(&_sidata + offset);
 		offset++;
 	}
 
 	// .bss section initialization
-	for(int *p = &_sbss; p <= &_ebss; p++) {
-		*p = 0; // Fill zero in all area
+	offset = 0;
+	while( &_sbss + offset < &_ebss ) {
+		*(&_sbss + offset) = 0;
+		offset++; // Fill zero in all area
 	}
 
 	SystemInit();
+#ifdef __cplusplus
 	__libc_init_array();
+#endif /* __cplusplus */
 	main();
 
 	/*
