@@ -40,7 +40,6 @@ main:
 	bic r1, r1, #(MODER_BIT7 << 1)
 	str r1, [r0]
 
-.extern fuck
 LEDToggle:
 	@@ set GPIOB_7
 	LDR r0, =GPIOB_ODR
